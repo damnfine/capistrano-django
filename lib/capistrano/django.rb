@@ -66,9 +66,6 @@ namespace :django do
     invoke 'django:compilemessages'
     invoke 'django:collectstatic'
     invoke 'django:symlink_settings'
-    if !fetch(:nginx)
-      invoke 'django:symlink_wsgi'
-    end
     invoke 'django:migrate'
   end
 
@@ -131,14 +128,6 @@ namespace :django do
     settings_path = File.join(release_path, fetch(:django_settings_dir))
     on roles(:all) do
       execute "ln -s #{settings_path}/#{fetch(:django_settings)}.py #{fetch(:django_project_dir)}/local_settings.py"
-    end
-  end
-
-  desc "Symlink wsgi script to live.wsgi"
-  task :symlink_wsgi do
-    on roles(:web) do
-      wsgi_path = File.join(release_path, fetch(:wsgi_path, 'wsgi'))
-      execute "ln -sf #{wsgi_path}/main.wsgi #{wsgi_path}/live.wsgi"
     end
   end
 
