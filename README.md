@@ -14,9 +14,10 @@ set :keep_releases, 5
 set :nginx, true
 set :deploy_to, '/www/app_name.com'
 set :wsgi_file, 'app_name.wsgi'
-set :npm_tasks, {:grunt => 'do_something', :gulp => 'something_else'}
 set :stage, :production
 set :django_settings, 'production'
+set :supervisor_pid_file, '/tmp/supervisor.pid'
+set :supervisor_config_file, 'supervisord.conf'
 role :web, "user@127.0.0.1"
 ```
 

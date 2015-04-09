@@ -4,23 +4,20 @@ namespace :deploy do
 
   desc 'Restart application'
   task :restart do
-    if fetch(:nginx)
-      invoke 'deploy:nginx_restart'
-    else
-      on roles(:web) do |h|
-        execute "sudo apache2ctl graceful"
-      end
-    end
+    invoke 'deploy:nginx_restart'
   end
 
   task :nginx_restart do
     on roles(:web) do |h|
       within release_path do
-        pid_file = "#{releases_path}/gunicorn.pid"
+        pid_file = "#{fetch(:supervisor_pid_file)}"
         if test "[ -e #{pid_file} ]"
+          # kill old supervisor process, about to be replaced with new one
           execute "kill `cat #{pid_file}`"
         end
-        execute "virtualenv/bin/gunicorn", "#{fetch(:wsgi_file)}:application", '-c=gunicorn_config.py', "--pid=#{pid_file}"
+        
+        # if supervisor isn't running, start it with the specified config file
+        execute "venv/bin/supervisord", '-c=#{fetch(:supervisor_config_file)}'
       end
     end
   end
@@ -31,7 +28,7 @@ namespace :python do
 
   def virtualenv_path
     File.join(
-      fetch(:shared_virtualenv) ? shared_path : release_path, "virtualenv"
+      fetch(:shared_virtualenv) ? shared_path : release_path, "venv"
     )
   end
 
@@ -41,29 +38,11 @@ namespace :python do
       execute "virtualenv #{virtualenv_path}"
       execute "#{virtualenv_path}/bin/pip install -r #{release_path}/#{fetch(:pip_requirements)}"
       if fetch(:shared_virtualenv)
-        execute :ln, "-s", virtualenv_path, File.join(release_path, 'virtualenv')
+        execute :ln, "-s", virtualenv_path, File.join(release_path, 'venv')
       end
     end
 
-    if fetch(:npm_tasks)
-      invoke 'nodejs:npm'
-    end
-    if fetch(:flask)
-      invoke 'flask:setup'
-    else
-      invoke 'django:setup'
-    end
-  end
-
-end
-
-namespace :flask do
-
-  task :setup do
-    on roles(:web) do |h|
-      execute "ln -s #{release_path}/settings/#{fetch(:settings_file)}.py #{release_path}/settings/deployed.py"
-      execute "ln -sf #{release_path}/wsgi/wsgi.py #{release_path}/wsgi/live.wsgi"
-    end
+    invoke 'django:setup'
   end
 
 end
@@ -73,11 +52,11 @@ namespace :django do
   def django(args, flags="", run_on=:all)
     on roles(run_on) do |h|
       manage_path = File.join(release_path, fetch(:django_project_dir) || '', 'manage.py')
-      execute "#{release_path}/virtualenv/bin/python #{manage_path} #{fetch(:django_settings)} #{args} #{flags}"
+      execute "#{release_path}/venv/bin/python #{manage_path} #{args} #{flags}"
     end
   end
 
-  after 'deploy:restart', 'django:restart_celery'
+  #after 'deploy:restart', 'django:restart_celery'
 
   desc "Setup Django environment"
   task :setup do
@@ -147,11 +126,11 @@ namespace :django do
     django("collectstatic", "-i *.coffee -i *.less -i node_modules/* -i bower_components/* --noinput")
   end
 
-  desc "Symlink django settings to deployed.py"
+  desc "Symlink django settings to local_settings.py"
   task :symlink_settings do
     settings_path = File.join(release_path, fetch(:django_settings_dir))
     on roles(:all) do
-      execute "ln -s #{settings_path}/#{fetch(:django_settings)}.py #{settings_path}/deployed.py"
+      execute "ln -s #{settings_path}/#{fetch(:django_settings)}.py #{fetch(:django_project_dir)}/local_settings.py"
     end
   end
 
@@ -171,31 +150,4 @@ namespace :django do
       django("migrate", "--noinput", run_on=:web)
     end
   end
-end
-
-namespace :nodejs do
-
-  desc 'Install node modules'
-  task :npm_install do
-    on roles(:web) do
-      path = fetch(:npm_path) ? File.join(release_path, fetch(:npm_path)) : release_path
-      within path do
-        execute 'npm', 'install', fetch(:npm_install_production, '--production')
-      end
-    end
-  end
-
-  desc 'Run npm tasks'
-  task :npm do
-    invoke 'nodejs:npm_install'
-    on roles(:web) do
-      path = fetch(:npm_path) ? File.join(release_path, fetch(:npm_path)) : release_path
-      within path do
-        fetch(:npm_tasks).each do |task, args|
-          execute "./node_modules/.bin/#{task}", args
-        end
-      end
-    end
-  end
-
 end

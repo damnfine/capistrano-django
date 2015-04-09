@@ -1,14 +1,14 @@
 Gem::Specification.new do |s|
 
   s.name     = "capistrano-django"
-  s.version  = "3.2.0"
+  s.version  = "4.0.0"
 
-  s.homepage = "http://github.com/mattjmorrison/capistrano-django"
+  s.homepage = "http://github.com/damnfine/capistrano-django"
   s.summary  = %q{capistrano-django - Welcome to easy deployment with Ruby over SSH for Django}
   s.description = %q{capistrano-django provides a solid basis for common django deployment}
 
   s.files    = Dir["lib/**/*.rb"]
-  s.add_dependency "capistrano", "~> 3.0.0"
+  s.add_dependency "capistrano", "~> 3.4.0"
 
   s.author   = "Matthew J. Morrison"
   s.email    = "mattjmorrison@mattjmorrison.com"
